@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inner Team Manager - 内面メンバー育成アプリ</title>
+    <!-- Tailwind CSSの読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap');
+
+        :root {
+            /* ホテルランチプレートをイメージしたカラーパレット */
+            --color-bg: #FDFBF7; /* 温かみのあるホワイト */
+            --color-card: #FFFFFF;
+            --color-text-main: #5C4D43; /* ダークブラウン */
+            --color-text-sub: #8C7A6B; /* カーキブラウン */
+            --color-accent-red: #E8B4B8; /* ペールレッド */
+            --color-accent-khaki: #C1A58D; /* カーキ */
+            --color-gray: #E5E0D8; /* ライトグレー/ベージュ */
+        }
+
+        body {
+            background-color: var(--color-bg);
+            color: var(--color-text-main);
+            font-family: 'Zen Kaku Gothic New', sans-serif;
+            /* 背景にうっすらとしたテクスチャ感を */
+            background-image: radial-gradient(var(--color-gray) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        h1, h2, h3, .serif {
+            font-family: 'Shippori Mincho', serif;
+        }
+
+        /* カスタムスクロールバー */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--color-bg);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--color-accent-khaki);
+            border-radius: 4px;
+        }
+
+        /* メンバーカードのアニメーションとスタイル */
+        .persona-card {
+            transition: all 0.3s ease;
+            border: 1px solid var(--color-gray);
+            box-shadow: 0 4px 6px -1px rgba(92, 77, 67, 0.05), 0 2px 4px -1px rgba(92, 77, 67, 0.03);
+        }
+        .persona-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(92, 77, 67, 0.1), 0 4px 6px -2px rgba(92, 77, 67, 0.05);
+        }
+
+        /* お留守（Inactive）状態のスタイル */
+        .persona-inactive {
+            opacity: 0.6;
+            background-color: #F8F6F2;
+            filter: grayscale(20%);
+        }
+        
+        .progress-bar-bg {
+            background-color: var(--color-gray);
+        }
+        .progress-bar-fill {
+            background-color: var(--color-accent-red);
+            transition: width 0.5s ease-out;
+        }
+
+        /* ボタンのカスタムスタイル */
+        .btn-primary {
+            background-color: var(--color-text-main);
+            color: white;
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover {
+            background-color: var(--color-text-sub);
+        }
+
+        /* 追加: リストビュー用のスタイルとログ履歴エリア */
+        .persona-list-item {
+            transition: all 0.2s ease;
+            border: 1px solid var(--color-gray);
+        }
+        .persona-list-item:hover {
+            background-color: #FAFAFA;
+        }
+        
+        .log-history-container {
+            max-height: 250px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto space-y-8">
+        
+        <!-- ヘッダー -->
+        <header class="text-center space-y-2 mb-10">
+            <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--color-text-main);">Inner Team Manager</h1>
+            <p class="text-sm md:text-base" style="color: var(--color-text-sub);">あなたの中の200人のメンバーと対話するセルフケア・ログ</p>
+        </header>
+
+        <!-- クイック・ログ入力エリア -->
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-[var(--color-gray)]">
+            <h2 class="text-xl font-semibold mb-4 flex items-center gap-2 serif">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-accent-khaki);"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                今日の気づきや、メンバーの発言を記録する
+            </h2>
+            
+            <form id="logForm" class="space-y-4">
+                <div>
+                    <textarea id="logText" rows="3" class="w-full p-3 rounded-xl border border-[var(--color-gray)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-khaki)] resize-none" placeholder="今日学んだこと、モヤモヤしたこと、ふと感じた違和感は？" required></textarea>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                    <div class="w-full sm:w-1/2 flex items-center gap-2">
+                        <label for="personaSelect" class="text-sm whitespace-nowrap" style="color: var(--color-text-sub);">視点タグ:</label>
+                        <select id="personaSelect" class="w-full p-2 rounded-lg border border-[var(--color-gray)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-khaki)] bg-white text-sm" required>
+                            <!-- JavaScriptで動的に追加されます -->
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full sm:w-auto px-6 py-2 rounded-full btn-primary font-medium flex items-center justify-center gap-2">
+                        <span>記録する</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    </button>
+                </div>
+            </form>
+            <div id="toast" class="hidden mt-4 p-3 rounded-lg text-sm text-center" style="background-color: var(--color-gray); color: var(--color-text-main);">
+                <!-- 通知メッセージ -->
+            </div>
+        </section>
+
+        <!-- 追加: ログ履歴セクション -->
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-[var(--color-gray)]">
+            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2 serif" style="color: var(--color-text-main);">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-accent-khaki);"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                これまでの気づき
+            </h2>
+            <div id="logHistoryContainer" class="log-history-container space-y-3 pr-2">
+                <!-- JavaScriptでログ履歴が動的に生成されます -->
+            </div>
+        </section>
+
+        <!-- ペルソナダッシュボード -->
+        <section>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+                <div class="flex items-center gap-4">
+                    <h2 class="text-2xl font-semibold serif">内面メンバーズルーム</h2>
+                    <span class="text-xs px-3 py-1 rounded-full border border-[var(--color-gray)]" style="color: var(--color-text-sub);">
+                        総記録数: <span id="totalLogsCount">0</span>
+                    </span>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <!-- 追加: 表示切り替えトグル -->
+                    <div class="flex bg-[var(--color-bg)] rounded-lg p-1 border border-[var(--color-gray)]">
+                        <button onclick="setView('grid')" id="btnViewGrid" class="p-1.5 rounded-md bg-white shadow-sm text-[var(--color-text-main)] transition-colors" title="カード表示">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+                        </button>
+                        <button onclick="setView('list')" id="btnViewList" class="p-1.5 rounded-md text-[var(--color-text-sub)] hover:text-[var(--color-text-main)] transition-colors" title="リスト表示">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
+                        </button>
+                    </div>
+
+                    <!-- メンバー追加ボタン -->
+                    <button onclick="openAddMemberModal()" class="px-4 py-2 rounded-full border-2 border-[var(--color-text-main)] text-[var(--color-text-main)] hover:bg-[var(--color-text-main)] hover:text-white transition-colors text-sm font-medium flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        メンバー追加
+                    </button>
+                </div>
+            </div>
+            
+            <!-- カード/リストグリッド -->
+            <div id="dashboardGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- JavaScriptでカードが動的に生成されます -->
+            </div>
+        </section>
+
+        <!-- やりたいことリストセクション -->
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-[var(--color-gray)]">
+            <h2 class="text-xl font-semibold mb-4 flex items-center gap-2 serif">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-accent-khaki);"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                やりたいこと・Wants リスト
+            </h2>    
+            <!-- ここから差し替え -->
+            <form id="wantForm" class="flex gap-2 mb-4">
+                <input type="text" id="wantInput" class="flex-grow p-3 rounded-xl border border-[var(--color-gray)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-khaki)]" placeholder="次にやりたいこと、叶えたいことは？" required>
+                <button type="submit" class="px-6 py-2 rounded-xl btn-primary font-medium whitespace-nowrap">追加</button>
+            </form>  <!-- ここまで差し替え -->
+            <ul id="wantsList" class="space-y-2">
+                <!-- JavaScriptで動的に生成されます -->
+            </ul>
+        </section> <!-- ここまで -->
+
+        <!-- 追加: メンバー追加モーダル -->
+        <div id="addMemberModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold serif" style="color: var(--color-text-main);">新しいメンバーを迎える</h3>
+                    <button onclick="closeAddMemberModal()" class="text-[var(--color-text-sub)] hover:text-[var(--color-text-main)]">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+                <form id="addMemberForm" class="space-y-4 text-sm">                 
+                    <!-- ▼▼ここから差し替え▼▼ -->
+                    <div>
+                        <label class="block mb-1 font-medium" style="color: var(--color-text-main);">名前</label>
+                        <input type="text" id="newMemberName" list="namePresets" class="w-full p-2 border border-[var(--color-gray)] rounded-lg focus:ring-2 focus:ring-[var(--color-accent-khaki)] focus:outline-none" placeholder="例: 完璧主義な自分" required>
+                        <!-- 名前候補のプルダウン -->
+                        <datalist id="namePresets">
+                            <option value="完璧主義な自分"></option>
+                            <option value="のんびり屋の自分"></option>
+                            <option value="批判的な自分"></option>
+                            <option value="励ましてくれる自分"></option>
+                            <option value="心配性の自分"></option>
+                            <option value="楽しませたい自分"></option>
+                        </datalist>
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="w-1/3">
+                            <label class="block mb-1 font-medium" style="color: var(--color-text-main);">アイコン</label>
+                            <input type="text" id="newMemberIcon" list="iconPresets" class="w-full p-2 border border-[var(--color-gray)] rounded-lg focus:ring-2 focus:ring-[var(--color-accent-khaki)] focus:outline-none" placeholder="🧐">
+                            <!-- アイコン候補のプルダウン -->
+                            <datalist id="iconPresets">
+                                <option value="🧐"></option>
+                                <option value="😴"></option>
+                                <option value="😤"></option>
+                                <option value="😇"></option>
+                                <option value="🥺"></option>
+                                <option value="🤡"></option>
+                            </datalist>
+                        </div>
+                        <div class="w-2/3">
+                            <label class="block mb-1 font-medium" style="color: var(--color-text-main);">目立ち度 (%)</label>
+                            <input type="number" id="newMemberProminence" list="prominencePresets" min="0" max="100" class="w-full p-2 border border-[var(--color-gray)] rounded-lg focus:ring-2 focus:ring-[var(--color-accent-khaki)] focus:outline-none" placeholder="例: 10">
+                            <!-- 目立ち度候補のプルダウン -->
+                            <datalist id="prominencePresets">
+                                <option value="10"></option>
+                                <option value="30"></option>
+                                <option value="50"></option>
+                                <option value="80"></option>
+                                <option value="100"></option>
+                            </datalist>
+                        </div>
+                    </div> <!-- ▲▲ここまで差し替え▲▲ -->
+
+                    <div>
+                        <label class="block mb-1 font-medium" style="color: var(--color-text-main);">口癖・発言内容</label>
+                        <input type="text" id="newMemberCatchphrase" class="w-full p-2 border border-[var(--color-gray)] rounded-lg focus:ring-2 focus:ring-[var(--color-accent-khaki)] focus:outline-none" placeholder="「もっとちゃんとやらなきゃ」">
+                    </div>
+                    <div>
+                        <label class="block mb-1 font-medium" style="color: var(--color-text-main);">好き</label>
+                        <input type="text" id="newMemberLikes" class="w-full p-2 border border-[var(--color-gray)] rounded-lg focus:ring-2 focus:ring-[var(--color-accent-khaki)] focus:outline-none" placeholder="整理整頓、賞賛">
+                    </div>
+                    <div>
+                        <label class="block mb-1 font-medium" style="color: var(--color-text-main);">嫌い</label>
+                        <input type="text" id="newMemberDislikes" class="w-full p-2 border border-[var(--color-gray)] rounded-lg focus:ring-2 focus:ring-[var(--color-accent-khaki)] focus:outline-none" placeholder="ミス、だらしないこと">
+                    </div>
+                    <div>
+                        <label class="block mb-1 font-bold text-[var(--color-accent-red)]">存在する理由・得られる利益</label>
+                        <textarea id="newMemberBenefit" rows="2" class="w-full p-2 border border-[var(--color-gray)] rounded-lg focus:ring-2 focus:ring-[var(--color-accent-khaki)] focus:outline-none resize-none" placeholder="失敗から守ってくれる。質の高い仕事ができる。"></textarea>
+                        <p class="text-xs mt-1" style="color: var(--color-text-sub);">※このメンバーがいることであなたが得ているメリット</p>
+                    </div>
+                    <button type="submit" class="w-full py-3 mt-2 rounded-full btn-primary font-bold text-base shadow-md">
+                        チームに迎え入れる
+                    </button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Supabaseライブラリの読み込み -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        // Supabaseの初期設定
+        const SUPABASE_URL = 'https://wmfmzfooybbbcbyueznd.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndtZm16Zm9veWJiYmNieXVlem5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0NDUyMTksImV4cCI6MjEwNjAyMTIxOX0._GbPDnRCPn91EL4bpCGPgPPVYS--2LEZlyNsAHk-Gag';
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // --- アプリケーションの状態管理 ---
+
+        // 新規追加分のメンバーリスト
+        const initialPersonas = [
+            { id: 'p1', name: '社長気質の自分', icon: '🎩', catchphrase: '「本当にそれで大丈夫か？もっと先を見据えよう」', likes: '効率化、決断、成長を感じること', dislikes: '無計画な行動、停滞', benefit: '社会的な成功や、長期的な安定をもたらしてくれる。', prominence_percentage: 45, level: 1, lastLogId: 0 },
+            { id: 'p2', name: '慎重派の自分', icon: '🦉', catchphrase: '「リスクはない？石橋を叩いて渡ろうよ」', likes: '安全、事前準備、静かな時間', dislikes: '急かされること、想定外のトラブル', benefit: '致命的な失敗や危険から身を守ってくれる。', prominence_percentage: 35, level: 1, lastLogId: 0 },
+            { id: 'p3', name: '筋トレの自分', icon: '💪', catchphrase: '「悩む前に体を動かせ！筋肉は裏切らない！」', likes: 'プロテイン、達成感、汗をかくこと', dislikes: 'サボること、言い訳', benefit: '身体の健康と、強靭なメンタルを維持してくれる。', prominence_percentage: 20, level: 1, lastLogId: 0 },
+            { id: 'p4', name: '人を評価する人、見下す人', icon: '🧐', catchphrase: '', likes: '', dislikes: '', benefit: '自尊心を守り、自分の優位性を確認して安心させてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p5', name: '自分を正当化する人', icon: '🛡️', catchphrase: '', likes: '', dislikes: '', benefit: '罪悪感や責任の重圧から心を守ってくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p6', name: 'ちょっとぐらいの汚れものならば食べてくれる人', icon: '🗑️', catchphrase: '', likes: '', dislikes: '', benefit: '環境への適応力。神経質になりすぎない大らかさ。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p7', name: '性欲担当の人', icon: '❤️‍🔥', catchphrase: '', likes: '', dislikes: '', benefit: '生命力、活力の源。種の保存の本能。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p8', name: '睡眠欲担当の人', icon: '💤', catchphrase: '', likes: '', dislikes: '', benefit: '脳と体を強制的に休ませ、過労死から防いでくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p9', name: '食欲担当の人', icon: '🍖', catchphrase: '', likes: '', dislikes: '', benefit: '栄養を取り込み、生きるエネルギーを生み出してくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p10', name: '人を殺そうとする人', icon: '🗡️', catchphrase: '', likes: '', dislikes: '', benefit: '極限の怒りによって、他者の脅威から自分を徹底的に防衛しようとする。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p11', name: '科学を探求したい人', icon: '🔬', catchphrase: '', likes: '', dislikes: '', benefit: '世界の真理を知り、知的好奇心を満たす喜びをくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p12', name: 'コードを書きたい人', icon: '💻', catchphrase: '', likes: '', dislikes: '', benefit: 'アイデアを形にし、創造する楽しさとスキルを与えてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p13', name: 'アプリを売って儲けたい人', icon: '💰', catchphrase: '', likes: '', dislikes: '', benefit: '経済的自由と、社会的な評価を獲得する原動力。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p14', name: 'お金が大事だと主張する人', icon: '💴', catchphrase: '', likes: '', dislikes: '', benefit: '現実的な生活基盤を守り、将来の不安を減らしてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p15', name: '過去の栄光にすがる人', icon: '🏆', catchphrase: '', likes: '', dislikes: '', benefit: '「自分には価値がある」と思い出させ、自信を繋ぎ止めてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p16', name: '家族を大事にする人', icon: '👨‍👩‍👧‍👦', catchphrase: '', likes: '', dislikes: '', benefit: '孤独を防ぎ、愛や繋がりという根源的な安心感をもたらす。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p17', name: '自分を殺したい人', icon: '🥀', catchphrase: '', likes: '', dislikes: '', benefit: '今の耐え難い苦痛や現状から「逃げたい・リセットしたい」というSOSのサイン。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p18', name: 'せっかちな人', icon: '⏱️', catchphrase: '', likes: '', dislikes: '', benefit: '時間を無駄にせず、物事をスピーディに進める推進力。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p19', name: '節約癖のある人', icon: '👛', catchphrase: '', likes: '', dislikes: '', benefit: 'リソースの枯渇を防ぎ、万が一の危機に備えさせてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p20', name: 'お金は流れて去ってゆくものだと主張する人', icon: '💸', catchphrase: 'どうせどこかで使う。私がもらわなくても誰かが使う。今使わなくてもいつか違う形で使う、出ていく。', likes: '', dislikes: '', benefit: '執着を手放し、気前よく今を楽しむ心の余裕を作ってくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p21', name: '時間を止めれるなら止めたい人', icon: '⏸️', catchphrase: '', likes: '', dislikes: '', benefit: '老いへの恐怖や、幸せな瞬間を永遠に味わいたいという純粋な願い。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p22', name: 'タイムマシンを開発して未来の技術を盗んできたい人', icon: '🛸', catchphrase: '', likes: '', dislikes: '', benefit: 'ずるをしてでも圧倒的な結果を出したい、という強い野心とハック精神。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p23', name: 'いちいち妻をおちょくったりいじめる人', icon: '😈', catchphrase: '', likes: '', dislikes: '', benefit: 'ちょっかいを出すことで、相手の関心を惹き、じゃれ合いのコミュニケーションを図る。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p24', name: 'Youtubeで自分よりみじめな人の動画を見て喜ぶ人', icon: '📺', catchphrase: '', likes: '', dislikes: '', benefit: '相対的な安心感を得て、下がった自己肯定感を応急処置で回復させてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            // ▼今回追加の20名▼
+            { id: 'p25', name: '他人は変えられないと主張する人', icon: '🪞', catchphrase: '鏡の中の寝癖は直せない=他人は変えられない、自分を変えること', likes: '', dislikes: '', benefit: '無駄な期待を手放し、自分のコントロールできることに集中させてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p26', name: '人を上に見たり下に見たりする人', icon: '⚖️', catchphrase: '出会う人、すれ違う人をジャッジしてしまう。', likes: '', dislikes: '', benefit: '社会的な立ち位置を確認し、安全を確保しようとする本能。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p27', name: '現実は過去の投影だと主張する人', icon: '📽️', catchphrase: '今の現実は、過去の自分の行いを投影しているもの。', likes: '', dislikes: '', benefit: '人生の責任を自分で引き受け、未来を変える力を与えてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p28', name: 'ハートの力を信じる人', icon: '💖', catchphrase: '頭よりもハートに馬力がある。願いが叶うのはハートの力。', likes: '', dislikes: '', benefit: '理屈を超えた直感と情熱で、現状を突破させてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p29', name: '潜在意識は斜め45度で助けてくれる人', icon: '🧭', catchphrase: '潜在意識は斜め45度で助けてくれる。', likes: '', dislikes: '', benefit: '予想外のルートからの助けを信じ、心に余裕を持たせてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p30', name: '未来の自分に委ねる人', icon: '🚀', catchphrase: '未来の自分はもっとすごい。委ねること。', likes: '', dislikes: '', benefit: '今の自分の限界にとらわれず、大きな可能性を信じさせてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p31', name: 'あらゆる支えに感謝する人', icon: '🙏', catchphrase: '食事前の「いただきます」ひとつでもいろんな人に支えられている。牛は育てられないし、野菜も私は栽培できない。', likes: '', dislikes: '', benefit: '世界との繋がりを感じ、謙虚さと幸福感を高めてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p32', name: 'お金は使うほど得と主張する人', icon: '🛍️', catchphrase: 'お金は使うほど得！', likes: '', dislikes: '', benefit: 'お金を循環させることで、経験や価値を豊かにしてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p33', name: 'どうしてこんなに上手くいくんだろうと言う人', icon: '✨', catchphrase: 'どうしてこんなに上手くいってるんだろう？', likes: '', dislikes: '', benefit: '良いことにフォーカスし、さらなる幸運を引き寄せるマインドセット。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p34', name: 'どうせ上手くいくと主張する人', icon: '😎', catchphrase: 'どうせ上手くいきますから、何か問題でも？', likes: '', dislikes: '', benefit: '根拠のない絶対的な自信で、不安を跳ね除けてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p35', name: '上手くいくのを止めない人', icon: '🛤️', catchphrase: '私は上手くいっている自分を止めることを諦めます。', likes: '', dislikes: '', benefit: '無意識の自己ブレーキ（サボタージュ）を解除してくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p36', name: '自分を労う人', icon: '🫂', catchphrase: '自分に向かって、いつもありがとう、よく頑張っているね、これからもよろしくね。', likes: '', dislikes: '', benefit: '自己受容を促し、心の土台を安定させてくれる究極の味方。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p37', name: '脳のRAS機能を主張する人', icon: '🧠', catchphrase: '脳のラス機能が働いている。', likes: '', dislikes: '', benefit: '意識を向けた情報を脳が集めてくれる仕組みを理解し、活用する。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p38', name: '違和感を赦す人', icon: '🕊️', catchphrase: 'イラッとした時や違和感を感じた時、それは私の普通に反するから。赦してあげよう。それもありかもね。', likes: '', dislikes: '', benefit: '他者との境界線を引き、怒りを手放して心を平和に保つ。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p39', name: '10倍稼ぐクズを見つける人', icon: '👀', catchphrase: '自分の10倍稼ぐクズを見つけると、なーんだと言って自分にもできるようになる。', likes: '', dislikes: '', benefit: '自分の中の不要なハードルを下げ、行動のブロックを外してくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p40', name: '両親の設定に気づかせる人', icon: '🧬', catchphrase: '優しいから両親の設定を受け継いでいるかも。両親を超えて幸せになってはいけないと思っているかも。', likes: '', dislikes: '', benefit: '家族に対する隠れた忠誠心に気づき、自分自身の人生を歩む許可をくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p41', name: '成功の妬みを受け入れる人', icon: '🌟', catchphrase: '成功したら少し妬まれるのは当たり前。妬まれるのが怖いから逃げるのは本末転倒。', likes: '', dislikes: '', benefit: '他人の目を恐れず、本当にやりたいことを貫く勇気をくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p42', name: '私の幸せが周りの幸せだと主張する人', icon: '🌻', catchphrase: '私が幸せだと周りも幸せになる。', likes: '', dislikes: '', benefit: '自分の幸せを最優先にすることが、結果的に他者貢献になると教えてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p43', name: '200人の自分を認識する人', icon: '👥', catchphrase: '自分の中には200人以上の違う自分がいて、それぞれ憧れを持つ。名前をつけて認識して鍛えれば良い。', likes: '', dislikes: '', benefit: '多様な自己を統合し、アプリ全体のコンセプトを牽引する大いなる視点。', prominence_percentage: 0, level: 1, lastLogId: 0 }
+        ];
+
+
+        // 初期Wantsリスト
+        const initialWants = [
+            "トライアンフ（バイク）を買う", "バイクの大型免許を取る", "個人事業主となり、場所に縛られない収入を得る。",
+            "ストレートネックを直す", "二重顎を直す", "ロシア語を話す", "中国語を話す", "韓国語を話す。",
+            "それぞれの国で恋を見つける", "人類があっと驚くような開発をする", "家庭用ロボットを開発する",
+            "宇宙開発する、ロケットを飛ばす", "千代田化工にエンジニアリングを外注する。", "居場所がわからないアプリを開発する",
+            "妻に縛られない生活をする", "山ピーのようにかっこよくなりたい", "有名になって、ユニクロなどの広告に出たい",
+            "異性からもてたい。", "どんどん食事やホテルに誘いたい。", "毎日仕事終わりにマッサージやストレッチの施術を受けたい。",
+            "毎日仕事終わりに温泉に入りたい。", "空とぶバイクを開発したい", "タイムマシンを開発したい",
+            "ドラえもんを作りたい", "夢のエネルギー源を開発したい", "儲かったお金でどんどん寄付をしたい。小学校など建てたい。",
+            "月面着陸する"
+        ];
+
+        let state = {
+            personas: [],
+            totalLogs: 0,
+            logs: [],
+            wants: []
+        };
+
+        let currentView = 'grid';
+        let editingMemberId = null; // 編集中のIDを管理
+
+        // データをSupabase（クラウド）から読み込む
+        async function loadData() {
+            // 1. ローカルストレージの過去データを確保
+            const savedDataStr = localStorage.getItem('innerTeamData');
+            let localState = null;
+            if (savedDataStr) {
+                localState = JSON.parse(savedDataStr);
+            }
+
+            try {
+                // 2. クラウドから取得を試みる
+                const { data: personasData, error: pErr } = await supabase.from('itm_personas').select('*');
+                const { data: logsData } = await supabase.from('itm_logs').select('*').order('created_at', { ascending: false });
+                const { data: wantsData } = await supabase.from('itm_wants').select('*').order('created_at', { ascending: false });
+
+                if (pErr) throw pErr; // エラーならcatchへ飛ばす
+
+                if (personasData && personasData.length > 0) {
+                    state.personas = personasData.map(p => ({ ...p, lastLogId: p.last_log_id }));
+                    state.logs = (logsData || []).map(l => ({ id: l.id, text: l.text, personaId: l.persona_id, timestamp: l.created_at }));
+                    state.wants = (wantsData || []).map(w => ({ id: w.id, text: w.text, personaId: w.persona_id, completed: w.is_completed }));
+                    state.totalLogs = state.logs.length;
+                } else if (localState && localState.personas && localState.personas.length > 0) {
+                    state = localState;
+                    await saveData(); // クラウドが空ならローカルデータをアップロード
+                } else {
+                    state.personas = [];
+                    state.logs = [];
+                    state.wants = [];
+                    state.totalLogs = 0;
+                }
+            } catch (error) {
+                // 3. 通信エラー（Cドライブ起動時のブロックなど）はオフラインモードとしてローカルデータを使う
+                console.warn("クラウド通信がオフラインのため、ローカルデータを使用します");
+                if (localState && localState.personas && localState.personas.length > 0) {
+                    state = localState;
+                } else {
+                    state.personas = [];
+                    state.logs = [];
+                    state.wants = [];
+                    state.totalLogs = 0;
+                }
+            }
+
+            // 4. 【重要】コード内に書き込んだ新しい初期メンバー（43人）とWantsを既存データに自動マージする
+            // これにより、ローカルの古いデータが読み込まれても新しいメンバーが消えません。
+            if (!state.logs) state.logs = [];
+            if (!state.wants) state.wants = [];
+
+            initialPersonas.forEach(ip => {
+                if (!state.personas.find(p => p.name === ip.name)) {
+                    state.personas.push(ip);
+                }
+            });
+            initialWants.forEach((iwText, index) => {
+                if (!state.wants.find(w => w.text === iwText)) {
+                    state.wants.push({ id: 'w' + (Date.now() + index), text: iwText, personaId: null, completed: false });
+                }
+            });
+
+            // 画面の描画
+            renderSelect();
+            renderDashboard();
+            renderLogs();
+            renderWants();
+        }
+
+        // データをSupabase（クラウド）に保存・同期する
+        async function saveData() {
+            // 万が一のためにローカルにもバックアップ保存（オフライン時はこれでデータが守られます）
+            localStorage.setItem('innerTeamData', JSON.stringify(state));
+
+            try {
+                if (state.personas.length > 0) {
+                    const mappedPersonas = state.personas.map(p => ({
+                        id: p.id.toString(), name: p.name, icon: p.icon, catchphrase: p.catchphrase,
+                        likes: p.likes, dislikes: p.dislikes, benefit: p.benefit,
+                        prominence_percentage: p.prominence_percentage, level: p.level, last_log_id: p.lastLogId || 0
+                    }));
+                    await supabase.from('itm_personas').upsert(mappedPersonas);
+                }
+
+                if (state.wants.length > 0) {
+                    const mappedWants = state.wants.map(w => ({
+                        id: w.id.toString(), text: w.text, persona_id: w.personaId || null, is_completed: w.completed || false
+                    }));
+                    await supabase.from('itm_wants').upsert(mappedWants);
+                }
+
+                if (state.logs.length > 0) {
+                    const mappedLogs = state.logs.map(l => ({
+                        id: l.id.toString(), text: l.text, persona_id: l.personaId || null, created_at: l.timestamp
+                    }));
+                    await supabase.from('itm_logs').upsert(mappedLogs);
+                }
+            } catch (error) {
+                // エラーログは出しますが、ローカルに保存されているので安全です
+                console.warn("クラウドへの保存はスキップされました（オフラインモード）");
+            }
+        } // ここまで差し替え
+
+        // --- UI更新ロジック ---
+
+
+        // プルダウンメニューの更新
+        function renderSelect() {
+            const select = document.getElementById('personaSelect');
+            select.innerHTML = '<option value="" disabled selected>どの自分の視点ですか？</option>';
+            
+            state.personas.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = `${p.icon} ${p.name}`;
+                select.appendChild(option);
+            });
+        }
+
+        // ダッシュボードのカードを更新
+        // プルダウンメニューの更新（Wants用も同時に更新）
+        function renderSelect() {
+            const selectLog = document.getElementById('personaSelect');
+            const selectWant = document.getElementById('wantPersonaSelect');
+            
+            const optionsHTML = '<option value="" disabled selected>誰の視点・要望？</option>' + 
+                state.personas.map(p => `<option value="${p.id}">${p.icon} ${p.name}</option>`).join('');
+            
+            if(selectLog) selectLog.innerHTML = optionsHTML;
+            if(selectWant) selectWant.innerHTML = optionsHTML;
+        }
+
+        // ダッシュボードのカードを更新 (編集ボタンを鉛筆マークで右上に配置)
+        function renderDashboard() {
+            const grid = document.getElementById('dashboardGrid');
+            grid.innerHTML = '';
+            
+            if (currentView === 'grid') {
+                grid.className = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6";
+            } else {
+                grid.className = "flex flex-col gap-4";
+            }
+
+            document.getElementById('totalLogsCount').textContent = state.totalLogs;
+            const sortedPersonas = [...state.personas].sort((a, b) => b.prominence_percentage - a.prominence_percentage);
+
+            sortedPersonas.forEach(p => {
+                const isInactive = state.totalLogs > 0 && (state.totalLogs - p.lastLogId) >= 3;
+                const inactiveClass = isInactive ? 'persona-inactive' : '';
+                const statusBadge = isInactive 
+                    ? `<span class="text-xs px-2 py-1 rounded-full bg-gray-200 text-gray-500 font-medium whitespace-nowrap mt-1">💤 お留守</span>`
+                    : `<span class="text-xs px-2 py-1 rounded-full bg-[var(--color-text-main)] text-white font-medium whitespace-nowrap mt-1">✨ アクティブ</span>`;
+
+                let itemHTML = '';
+
+                if (currentView === 'grid') {
+                    itemHTML = `
+                        <div class="persona-card bg-white p-5 rounded-2xl flex flex-col h-full relative ${inactiveClass}">
+                            <!-- 差し替え: 右上の編集・削除ボタン（上下に並べる: flex-col を追加） -->
+                            <div class="absolute top-4 right-4 flex flex-col gap-2 z-10">
+                                <button onclick="openEditMemberModal('${p.id}')" class="text-sm opacity-50 hover:opacity-100 hover:scale-110 transition-all cursor-pointer" title="編集する">✏️</button>
+                                <button onclick="deleteMember('${p.id}', '${p.name}')" class="text-sm opacity-50 hover:opacity-100 hover:scale-110 transition-all cursor-pointer" title="手放す（削除）">🗑️</button>
+                            </div> <!-- ここまで -->
+                            
+                            <div class="flex justify-between items-start mb-3 pr-10">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-3xl">${p.icon}</span>
+                                    <div>
+                                        <h3 class="font-bold text-lg leading-tight" style="color: var(--color-text-main);">${p.name}</h3>
+                                        <p class="text-xs font-semibold" style="color: var(--color-accent-khaki);">Lv. ${p.level}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-2">${statusBadge}</div>
+                            
+                            <div class="mb-4 flex-grow">
+                                <p class="text-sm italic mb-3 font-medium" style="color: var(--color-text-main);">
+                                    ${p.catchphrase || '（口癖なし）'}
+                                </p>
+                                <div class="text-xs space-y-1 mb-3">
+                                    <p><span class="font-bold text-[var(--color-accent-red)]">♡ 好き:</span> ${p.likes || '-'}</p>
+                                    <p><span class="font-bold" style="color: var(--color-text-sub);">× 嫌い:</span> ${p.dislikes || '-'}</p>
+                                </div>
+                                <div class="text-xs p-2 rounded-lg bg-[var(--color-bg)] border border-[var(--color-gray)]">
+                                    <p class="font-bold mb-1" style="color: var(--color-accent-red);">🎁 存在する理由・利益</p>
+                                    <p style="color: var(--color-text-main); line-height: 1.4;">${p.benefit || '未設定'}</p>
+                                </div>
+                            </div>
+
+                            <div class="mt-auto pt-4 border-t border-[var(--color-gray)]">
+                                <div class="flex justify-between items-end mb-1">
+                                    <span class="text-xs font-semibold" style="color: var(--color-text-sub);">脳内シェア (目立ち度)</span>
+                                    <span class="text-sm font-bold serif" style="color: var(--color-text-main);">${Math.round(p.prominence_percentage)}%</span>
+                                </div>
+                                <div class="w-full h-2 rounded-full progress-bar-bg overflow-hidden">
+                                    <div class="h-full progress-bar-fill rounded-full" style="width: ${p.prominence_percentage}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    itemHTML = `
+                        <div class="persona-list-item bg-white p-4 rounded-xl flex flex-col sm:flex-row gap-4 items-start sm:items-center relative ${inactiveClass}">
+                            <!-- 差し替え: リスト側の右上の編集・削除ボタン（スマホ時は上下、PC時は横並び）▼▼ -->
+                            <div class="absolute top-4 right-4 sm:top-1/2 sm:-translate-y-1/2 flex flex-col sm:flex-row gap-2 sm:gap-3 z-10">
+                                <button onclick="openEditMemberModal('${p.id}')" class="text-sm opacity-50 hover:opacity-100 hover:scale-110 transition-all cursor-pointer" title="編集する">✏️</button>
+                                <button onclick="deleteMember('${p.id}', '${p.name}')" class="text-sm opacity-50 hover:opacity-100 hover:scale-110 transition-all cursor-pointer" title="手放す（削除）">🗑️</button>
+                            </div> <!-- ここまで -->
+                            
+                            <div class="flex items-center gap-3 w-full sm:w-1/3 min-w-[200px] pr-10 sm:pr-20">
+                                <span class="text-3xl">${p.icon}</span>
+                                <div>
+                                    <h3 class="font-bold text-base leading-tight" style="color: var(--color-text-main);">${p.name}</h3>
+                                    <div class="flex items-center gap-2 mt-1">
+                                        <p class="text-xs font-semibold" style="color: var(--color-accent-khaki);">Lv. ${p.level}</p>
+                                        ${statusBadge}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="w-full sm:w-1/3 text-sm flex-grow">
+                                <p class="italic text-[var(--color-text-main)] truncate" title="${p.catchphrase || ''}">${p.catchphrase || '（口癖なし）'}</p>
+                                <p class="text-xs mt-1 text-[var(--color-text-sub)] truncate" title="${p.benefit || ''}">🎁 ${p.benefit || '理由未設定'}</p>
+                            </div>
+                            
+                            <div class="w-full sm:w-1/4 flex items-center gap-3 pr-10 sm:pr-20">
+                                <div class="flex-grow">
+                                    <div class="flex justify-between items-end mb-1">
+                                        <span class="text-xs font-semibold" style="color: var(--color-text-sub);">シェア</span>
+                                        <span class="text-xs font-bold serif" style="color: var(--color-text-main);">${Math.round(p.prominence_percentage)}%</span>
+                                    </div>
+                                    <div class="w-full h-1.5 rounded-full progress-bar-bg overflow-hidden">
+                                        <div class="h-full progress-bar-fill rounded-full" style="width: ${p.prominence_percentage}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                grid.insertAdjacentHTML('beforeend', itemHTML);
+            });
+        }
+
+        // 表示切り替えトグルのロジック
+        function setView(viewMode) {
+            currentView = viewMode;
+            
+            const btnGrid = document.getElementById('btnViewGrid');
+            const btnList = document.getElementById('btnViewList');
+            
+            if (viewMode === 'grid') {
+                btnGrid.classList.replace('text-[var(--color-text-sub)]', 'text-[var(--color-text-main)]');
+                btnGrid.classList.add('bg-white', 'shadow-sm');
+                btnList.classList.replace('text-[var(--color-text-main)]', 'text-[var(--color-text-sub)]');
+                btnList.classList.remove('bg-white', 'shadow-sm');
+            } else {
+                btnList.classList.replace('text-[var(--color-text-sub)]', 'text-[var(--color-text-main)]');
+                btnList.classList.add('bg-white', 'shadow-sm');
+                btnGrid.classList.replace('text-[var(--color-text-main)]', 'text-[var(--color-text-sub)]');
+                btnGrid.classList.remove('bg-white', 'shadow-sm');
+            }
+            
+            renderDashboard();
+        }
+
+        // ログ履歴の描画
+        function renderLogs() {
+            const container = document.getElementById('logHistoryContainer');
+            container.innerHTML = '';
+            
+            if (state.logs.length === 0) {
+                container.innerHTML = '<p class="text-sm text-center py-4" style="color: var(--color-text-sub);">まだ記録はありません。最初の気づきを書いてみましょう。</p>';
+                return;
+            }
+
+            // 新しい順に表示
+            state.logs.forEach(log => {
+                const persona = state.personas.find(p => p.id === log.personaId);
+                const personaIcon = persona ? persona.icon : '👤';
+                const personaName = persona ? persona.name : '削除されたメンバー';
+                
+                // 日付のフォーマット (例: 10/11 14:30)
+                const dateObj = new Date(log.timestamp);
+                const dateStr = `${dateObj.getMonth() + 1}/${dateObj.getDate()} ${dateObj.getHours().toString().padStart(2, '0')}:${dateObj.getMinutes().toString().padStart(2, '0')}`;
+
+                const logHTML = `
+                    <div class="flex gap-3 p-3 rounded-xl bg-[var(--color-bg)] border border-[var(--color-gray)]">
+                        <div class="text-2xl mt-1">${personaIcon}</div>
+                        <div class="flex-grow">
+                            <div class="flex justify-between items-start mb-1">
+                                <span class="text-xs font-bold px-2 py-0.5 rounded bg-white border border-[var(--color-gray)]" style="color: var(--color-text-main);">${personaName}</span>
+                                <span class="text-xs" style="color: var(--color-text-sub);">${dateStr}</span>
+                            </div>
+                            <p class="text-sm whitespace-pre-wrap" style="color: var(--color-text-main); line-height: 1.5;">${log.text}</p>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', logHTML);
+            });
+        }
+
+        // トースト通知を表示
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+
+        // --- イベントリスナーとゲームロジック ---
+
+        document.getElementById('logForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const text = document.getElementById('logText').value;
+            const personaId = document.getElementById('personaSelect').value;
+
+            if (!text || !personaId) return;
+
+            // 全体のログ回数を増やす
+            state.totalLogs++;
+
+            // ログ履歴に保存
+            const newLog = {
+                id: Date.now(),
+                text: text,
+                personaId: personaId,
+                timestamp: new Date().toISOString()
+            };
+            state.logs.unshift(newLog); // 最新を一番上に追加
+
+            // 選択されたペルソナを見つける
+            const activePersona = state.personas.find(p => p.id === personaId);
+            
+            // レベルアップと最終稼働更新
+            activePersona.level++;
+            activePersona.lastLogId = state.totalLogs;
+
+            // 目立ち度（プロミネンス）の再計算
+            // 選択されたメンバーに +10% のボーナス、残りを他メンバーから比率に応じて減算
+            let bonus = 10;
+            
+            // 上限100%を超えないための調整
+            if (activePersona.prominence_percentage + bonus > 100) {
+                bonus = 100 - activePersona.prominence_percentage;
+            }
+
+            // 他のメンバーからボーナス分を減らす（最低0%を保証）
+            const otherPersonas = state.personas.filter(p => p.id !== personaId);
+            let totalOtherProminence = otherPersonas.reduce((sum, p) => sum + p.prominence_percentage, 0);
+            
+            if (totalOtherProminence > 0) {
+                otherPersonas.forEach(p => {
+                    // 他のメンバーの現在の割合に応じて減算分を割り当てる
+                    let deduction = bonus * (p.prominence_percentage / totalOtherProminence);
+                    p.prominence_percentage = Math.max(0, p.prominence_percentage - deduction);
+                });
+            }
+
+            activePersona.prominence_percentage += bonus;
+
+            // 誤差をなくすための正規化（合計を100に合わせる）
+            let newTotal = state.personas.reduce((sum, p) => sum + p.prominence_percentage, 0);
+            state.personas.forEach(p => {
+                p.prominence_percentage = (p.prominence_percentage / newTotal) * 100;
+            });
+
+            // 状態の保存とUI更新
+            saveData();
+            renderDashboard();
+            renderLogs();
+            
+            // フォームのリセットとフィードバック
+            document.getElementById('logText').value = '';
+            document.getElementById('personaSelect').value = '';
+            
+            showToast(`記録完了！「${activePersona.name}」のレベルが上がりました。`);
+        });
+
+        // --- モーダルの開閉とメンバー追加ロジック ---
+        function openAddMemberModal() {
+            editingMemberId = null;
+            document.querySelector('#addMemberModal h3').textContent = '新しいメンバーを迎える';
+            document.getElementById('addMemberForm').reset();
+            const modal = document.getElementById('addMemberModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        // 編集モーダルを開く
+        function openEditMemberModal(id) {
+            editingMemberId = id;
+            document.querySelector('#addMemberModal h3').textContent = 'メンバー情報を編集する';
+            
+            const persona = state.personas.find(p => p.id === id);
+            if (persona) {
+                document.getElementById('newMemberName').value = persona.name || '';
+                document.getElementById('newMemberIcon').value = persona.icon || '';
+                document.getElementById('newMemberProminence').value = persona.prominence_percentage || 0;
+                document.getElementById('newMemberCatchphrase').value = persona.catchphrase || '';
+                document.getElementById('newMemberLikes').value = persona.likes || '';
+                document.getElementById('newMemberDislikes').value = persona.dislikes || '';
+                document.getElementById('newMemberBenefit').value = persona.benefit || '';
+            }
+            
+            const modal = document.getElementById('addMemberModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        // 編集モーダルを閉じる
+        function closeAddMemberModal() {
+            const modal = document.getElementById('addMemberModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.getElementById('addMemberForm').reset();
+            editingMemberId = null;
+        }
+
+        // メンバーを削除（手放す）ロジック（クラウド対応版）
+        async function deleteMember(id, name) {
+            if (!confirm(`「${name}」をチームから手放しますか？\n※この操作は取り消せません。`)) return;
+
+            // まずクラウドから削除
+            await supabase.from('itm_personas').delete().eq('id', id);
+
+            state.personas = state.personas.filter(p => p.id !== id);
+            if (state.wants) {
+                state.wants.forEach(w => { if (w.personaId === id) w.personaId = null; });
+            }
+            let totalProminence = state.personas.reduce((sum, p) => sum + p.prominence_percentage, 0);
+            if (totalProminence > 0) {
+                state.personas.forEach(p => { p.prominence_percentage = (p.prominence_percentage / totalProminence) * 100; });
+            }
+
+            await saveData();
+            renderSelect();
+            renderDashboard();
+            renderWants();
+            showToast(`「${name}」を手放しました。`);
+        }
+
+        document.getElementById('addMemberForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const nameVal = document.getElementById('newMemberName').value;
+            const iconVal = document.getElementById('newMemberIcon').value || '👤';
+            const catchphraseVal = document.getElementById('newMemberCatchphrase').value || '';
+            const likesVal = document.getElementById('newMemberLikes').value || '';
+            const dislikesVal = document.getElementById('newMemberDislikes').value || '';
+            const benefitVal = document.getElementById('newMemberBenefit').value || '';
+            const prominenceVal = parseFloat(document.getElementById('newMemberProminence').value) || 0;
+
+            if (editingMemberId) {
+                // 既存メンバーの更新
+                const persona = state.personas.find(p => p.id === editingMemberId);
+                if (persona) {
+                    persona.name = nameVal;
+                    persona.icon = iconVal;
+                    persona.catchphrase = catchphraseVal;
+                    persona.likes = likesVal;
+                    persona.dislikes = dislikesVal;
+                    persona.benefit = benefitVal;
+                    persona.prominence_percentage = prominenceVal;
+                }
+                showToast(`「${nameVal}」の情報を更新しました！`);
+            } else {
+                // 新規メンバーの追加
+                const newMember = {
+                    id: 'p' + Date.now(),
+                    name: nameVal,
+                    icon: iconVal,
+                    catchphrase: catchphraseVal,
+                    likes: likesVal,
+                    dislikes: dislikesVal,
+                    benefit: benefitVal,
+                    prominence_percentage: prominenceVal,
+                    level: 1,
+                    lastLogId: state.totalLogs
+                };
+                state.personas.push(newMember);
+                showToast(`新しいメンバー「${nameVal}」を迎え入れました！`);
+            }
+            
+            // 目立ち度（プロミネンス）の合計が100%になるように再計算（正規化）
+            let totalProminence = state.personas.reduce((sum, p) => sum + p.prominence_percentage, 0);
+            if (totalProminence > 0) {
+                state.personas.forEach(p => {
+                    p.prominence_percentage = (p.prominence_percentage / totalProminence) * 100;
+                });
+            }
+
+            saveData();
+            renderSelect();
+            renderDashboard();
+            closeAddMemberModal();
+        });
+
+        document.getElementById('addMemberModal').addEventListener('click', function(e) {
+            if (e.target === this) closeAddMemberModal();
+        });
+
+
+        // --- やりたいことリスト（Wants）のロジック ---
+        const wantForm = document.getElementById('wantForm');
+        if(wantForm) {
+            wantForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const input = document.getElementById('wantInput');
+                const text = input.value.trim();
+                if (!text) return;
+
+                // 新規追加時は「誰の要望か」を空（null）にして追加
+                state.wants.unshift({ id: Date.now(), text: text, personaId: null, completed: false });
+                saveData();
+                renderWants();
+                input.value = '';
+                showToast('やりたいことを追加しました！');
+            });
+        }
+
+        // やりたいことリストを描画（各行にプルダウンを設置）
+        function renderWants() {
+            const list = document.getElementById('wantsList');
+            if(!list) return;
+            list.innerHTML = '';
+            
+            if (!state.wants || state.wants.length === 0) {
+                list.innerHTML = '<p class="text-sm text-center py-4" style="color: var(--color-text-sub);">まだやりたいことはありません。小さなことから書いてみましょう。</p>';
+                return;
+            }
+
+            state.wants.forEach(want => {
+                const li = document.createElement('li');
+                li.className = "flex flex-col sm:flex-row sm:items-center justify-between p-3 gap-3 rounded-lg border border-[var(--color-gray)] bg-[var(--color-bg)] transition-colors hover:bg-white";
+                
+                const isChecked = want.completed ? 'checked' : '';
+                const textClass = want.completed ? 'line-through text-[var(--color-text-sub)]' : 'text-[var(--color-text-main)]';
+                
+                // メンバー選択用のプルダウン（各項目に配置）
+                let selectHTML = `<select onchange="updateWantPersona(${want.id}, this.value)" class="w-full sm:w-auto sm:max-w-[180px] p-2 text-xs rounded-lg border border-[var(--color-gray)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-khaki)] bg-white cursor-pointer" style="color: var(--color-text-main);">`;
+                selectHTML += `<option value="" ${!want.personaId ? 'selected' : ''} disabled>誰の要望？</option>`;
+                
+                // 登録されているメンバーをすべて選択肢に追加
+                state.personas.forEach(p => {
+                    const isSelected = p.id === want.personaId ? 'selected' : '';
+                    selectHTML += `<option value="${p.id}" ${isSelected}>${p.icon} ${p.name}</option>`;
+                });
+                selectHTML += `</select>`;
+
+                li.innerHTML = `
+                    <div class="flex items-center gap-3 flex-grow pr-2 overflow-hidden">
+                        <input type="checkbox" ${isChecked} onchange="toggleWant(${want.id})" class="w-5 h-5 accent-[var(--color-accent-khaki)] cursor-pointer rounded flex-shrink-0">
+                        <span class="${textClass} font-medium text-sm sm:text-base truncate" title="${want.text}">${want.text}</span>
+                    </div>
+                    
+                    <div class="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto justify-end mt-2 sm:mt-0">
+                        ${selectHTML}
+                        <button onclick="deleteWant(${want.id})" class="text-[var(--color-text-sub)] hover:text-red-400 transition-colors p-2 flex-shrink-0" title="削除">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                    </div>
+                `;
+                list.appendChild(li);
+            });
+        }
+
+        // 項目の「誰の要望か」を変更した時に保存する関数
+        function updateWantPersona(id, personaId) {
+            const want = state.wants.find(w => w.id === id);
+            if (want) {
+                want.personaId = personaId;
+                saveData();
+                showToast('誰の要望かを保存しました！');
+            }
+        }
+
+        // やりたいことリストの完了状態を切り替え
+        function toggleWant(id) {
+            const want = state.wants.find(w => w.id === id);
+            if (want) {
+                want.completed = !want.completed;
+                saveData();
+                renderWants();
+            }
+        }
+
+        // やりたいことリストを削除（クラウド対応版）
+        async function deleteWant(id) {
+            await supabase.from('itm_wants').delete().eq('id', id); // クラウドから削除
+            state.wants = state.wants.filter(w => w.id !== id);
+            await saveData();
+            renderWants();
+        }
+
+        // --- 初期化（クラウド対応版） ---
+        window.onload = async function() {
+            await loadData();
+        };
+
+    </script>
+</body>
+
+</html>
