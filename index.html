@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inner Team Manager - 内面メンバー育成アプリ</title>
+    <!-- SEO対策用メタディスクリプション -->
+    <meta name="description" content="あなたの中の200人のメンバーと対話するセルフケア・ログ。出先でスマホからふと思いついた気づきやWantsを入力し、家に帰ってPCを開くとちゃんと反映されていて続きからマネジメントできる、理想のセルフケア環境を提供します。">
     <!-- Tailwind CSSの読み込み -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -69,9 +71,14 @@
     <div class="max-w-4xl mx-auto space-y-8">
         
         <!-- ヘッダー -->
-        <header class="text-center space-y-2 mb-10">
+        <header class="text-center space-y-3 mb-10">
             <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--color-text-main);">Inner Team Manager</h1>
-            <p class="text-sm md:text-base" style="color: var(--color-text-sub);">あなたの中の200人のメンバーと対話するセルフケア・ログ</p>
+            <p class="text-sm md:text-base font-medium" style="color: var(--color-text-sub);">あなたの中の200人のメンバーと対話するセルフケア・ログ</p>
+            <!-- SEO対策とアプリのコンセプト説明 -->
+            <p class="text-xs md:text-sm mx-auto max-w-2xl leading-relaxed" style="color: var(--color-text-sub); opacity: 0.85;">
+                出先でスマホからふと思いついた気づきやWantsを入力する ➜ 家に帰ってPCを開くと、それがちゃんと反映されていて続きからマネジメントできる。<br class="hidden sm:block">
+                いつでもどこでも自分と向き合える、理想のセルフケア環境です。
+            </p>
         </header>
 
         <!-- クイック・ログ入力エリア -->
@@ -287,8 +294,15 @@
             { id: 'p40', name: '両親の設定に気づかせる人', icon: '🧬', catchphrase: '優しいから両親の設定を受け継いでいるかも。両親を超えて幸せになってはいけないと思っているかも。', likes: '', dislikes: '', benefit: '家族に対する隠れた忠誠心に気づき、自分自身の人生を歩む許可をくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
             { id: 'p41', name: '成功の妬みを受け入れる人', icon: '🌟', catchphrase: '成功したら少し妬まれるのは当たり前。妬まれるのが怖いから逃げるのは本末転倒。', likes: '', dislikes: '', benefit: '他人の目を恐れず、本当にやりたいことを貫く勇気をくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
             { id: 'p42', name: '私の幸せが周りの幸せだと主張する人', icon: '🌻', catchphrase: '私が幸せだと周りも幸せになる。', likes: '', dislikes: '', benefit: '自分の幸せを最優先にすることが、結果的に他者貢献になると教えてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
-            { id: 'p43', name: '200人の自分を認識する人', icon: '👥', catchphrase: '自分の中には200人以上の違う自分がいて、それぞれ憧れを持つ。名前をつけて認識して鍛えれば良い。', likes: '', dislikes: '', benefit: '多様な自己を統合し、アプリ全体のコンセプトを牽引する大いなる視点。', prominence_percentage: 0, level: 1, lastLogId: 0 }
-        ];
+            { id: 'p43', name: '200人の自分を認識する人', icon: '👥', catchphrase: '自分の中には200人以上の違う自分がいて、それぞれ憧れを持つ。名前をつけて認識して鍛えれば良い。', likes: '', dislikes: '', benefit: '多様な自己を統合し、アプリ全体のコンセプトを牽引する大いなる視点。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p44', name: 'もう一度自分になりたい人', icon: '👼', catchphrase: '「生まれ変わっても、もう一度自分として生きていきたい。」', likes: '', dislikes: '', benefit: '自分自身の存在を根本から肯定し、「今の自分」であることへの深い自己愛と満足感を与えてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p45', name: '自分が中心ではないと諭す人', icon: '🌍', catchphrase: '「私が何もしていなくても地球は回る。自分が世界の中心だと勘違いするな。」', likes: '', dislikes: '', benefit: '過剰な責任感や自意識過剰を手放させ、世界は自分なしでも回っているという事実で、肩の力を抜いて生きる余裕をくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p46', name: 'いつまでも若々しくいたい人', icon: '✨', catchphrase: '「年齢を重ねても、いつまでも若々しい見た目とかっこよさを保ちたい。」', likes: '', dislikes: '', benefit: '美容や健康への高いモチベーションを保ち続け、日々の自己ケアを怠らないエネルギッシュな日常をサポートしてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p47', name: 'ガラス越しの自分をチェックする人', icon: '🪟', catchphrase: '「歩いている時にガラスに映る自分を見て、無意識に髪型や服装を直してしまう。」', likes: '', dislikes: '', benefit: '他者から自分がどう見えているのかを常に適度に意識させ、清潔感や良好な社会的イメージを保ち続けてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p48', name: '話しかけられず自己嫌悪する人', icon: '🤐', catchphrase: '「本当は話しかけたかったのに…。また勇気が出なくて、自分は本当にダメだな。」', likes: '', dislikes: '', benefit: '「もっとフランクに会話を楽しみたい」という純粋な向上心の表れ。人間関係への高い関心と、現状を打ち破りたいエネルギーを秘めている。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p49', name: 'テストランとして割り切る人', icon: '🧪', catchphrase: '「真剣に悩みすぎなくていい。とりあえずテストランだと思って、データを取るつもりでサクッと進めようよ。」', likes: '', dislikes: '', benefit: '失敗へのプレッシャーをなくし、プロトタイプを作るように素早い行動のハードルを下げてくれる貴重な実験思考。', prominence_percentage: 0, level: 1, lastLogId: 0 },
+            { id: 'p50', name: '妻の繰り返しに反論する人', icon: '😤', catchphrase: '「また同じこと言ってる…。わかってるのに何度も言われると、ついイライラして言い返したくなる。」', likes: '', dislikes: '', benefit: '自分なりのペースややり方を守ろうとする自立心の表れ。身近な関係だからこそ起こる摩擦を、より良い距離感を探るためのサインにしてくれる。', prominence_percentage: 0, level: 1, lastLogId: 0 }
+            ];
 
         // 初期Wantsリスト
         const initialWants = [
