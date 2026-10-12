@@ -187,8 +187,8 @@
     <script>
         const SUPABASE_URL = 'https://wmfmzfooybbbcbyueznd.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndtZm16Zm9veWJiYmNieXVlem5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0NDUyMTksImV4cCI6MjEwNjAyMTIxOX0._GbPDnRCPn91EL4bpCGPgPPVYS--2LEZlyNsAHk-Gag';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
         const initialPersonas = [
             { id: 'p1', name: '社長気質の自分', icon: '🎩', catchphrase: '「本当にそれで大丈夫か？もっと先を見据えよう」', likes: '効率化、決断、成長を感じること', dislikes: '無計画な行動、停滞', benefit: '社会的な成功や、長期的な安定をもたらしてくれる。', prominence_percentage: 45, level: 1, lastLogId: 0 },
             { id: 'p2', name: '慎重派の自分', icon: '🦉', catchphrase: '「リスクはない？石橋を叩いて渡ろうよ」', likes: '安全、事前準備、静かな時間', dislikes: '急かされること、想定外のトラブル', benefit: '致命的な失敗や危険から身を守ってくれる。', prominence_percentage: 35, level: 1, lastLogId: 0 },
