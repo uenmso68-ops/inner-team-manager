@@ -247,97 +247,111 @@
             "月面着陸する"
         ];
 
-        let state = { personas: [], totalLogs: 0, logs: [], wants: [] };
+let state = { personas: [], totalLogs: 0, logs: [], wants: [] };
         let currentView = 'grid';
         let editingMemberId = null;
 
+        // 1. アプリ起動：クラウドを待たずに最速で画面を作る
         async function loadData() {
             let localState = null;
             try {
                 const savedDataStr = localStorage.getItem('innerTeamData');
                 if (savedDataStr) localState = JSON.parse(savedDataStr);
-            } catch (e) {}
+            } catch (e) { console.warn("ローカルデータ読み込みエラー"); }
 
+            if (localState && localState.personas && localState.personas.length > 0) {
+                state = localState;
+            }
+
+            // 安全確保（変なデータが入っていても配列に戻す）
+            if (!state.personas || !Array.isArray(state.personas)) state.personas = [];
+            if (!state.logs || !Array.isArray(state.logs)) state.logs = [];
+            if (!state.wants || !Array.isArray(state.wants)) state.wants = [];
+
+            // 初期メンバーとWantsの補完
+            initialPersonas.forEach(ip => {
+                if (!state.personas.find(p => p && p.name === ip.name)) {
+                    state.personas.push(ip);
+                }
+            });
+            initialWants.forEach((iwText, index) => {
+                if (!state.wants.find(w => w && w.text === iwText)) {
+                    state.wants.push({ id: 'w' + (Date.now() + index), text: iwText, personaId: null, completed: false });
+                }
+            });
+
+            // ★ 超重要：通信を待たずに、ここで「まず画面を描画」する！
+            safeRenderAll();
+
+            // 裏側でこっそりクラウドと同期する
+            syncWithCloud();
+        }
+
+        // 安全にすべての画面を描画する関数（クラッシュ防止）
+        function safeRenderAll() {
+            try { renderSelect(); } catch(e){ console.error(e); }
+            try { renderDashboard(); } catch(e){ console.error(e); }
+            try { renderLogs(); } catch(e){ console.error(e); }
+            try { renderWants(); } catch(e){ console.error(e); }
+        }
+
+        // バックグラウンドでクラウドと同期
+        async function syncWithCloud() {
             try {
                 const { data: personasData, error: pErr } = await supabase.from('itm_personas').select('*');
                 const { data: logsData } = await supabase.from('itm_logs').select('*').order('created_at', { ascending: false });
                 const { data: wantsData } = await supabase.from('itm_wants').select('*').order('created_at', { ascending: false });
 
-                if (pErr) throw pErr;
-
-                if (personasData && personasData.length > 0) {
+                if (!pErr && personasData && personasData.length > 0) {
                     state.personas = personasData.map(p => ({ ...p, lastLogId: p.last_log_id }));
                     state.logs = (logsData || []).map(l => ({ id: l.id, text: l.text, personaId: l.persona_id, timestamp: l.created_at }));
                     state.wants = (wantsData || []).map(w => ({ id: w.id, text: w.text, personaId: w.persona_id, completed: w.is_completed }));
                     state.totalLogs = state.logs.length;
-                } else if (localState && localState.personas && localState.personas.length > 0) {
-                    state = localState;
-                    await saveData();
+                    
+                    safeRenderAll(); // クラウドのデータで画面を更新
                 } else {
-                    state.personas = []; state.logs = []; state.wants = []; state.totalLogs = 0;
+                    await saveData(); // クラウドが空ならローカルデータをアップロード
                 }
             } catch (error) {
-                console.warn("クラウド通信エラー", error);
-                if (localState && localState.personas && localState.personas.length > 0) {
-                    state = localState;
-                } else {
-                    state.personas = []; state.logs = []; state.wants = []; state.totalLogs = 0;
-                }
+                console.warn("バックグラウンド同期スキップ（オフライン）");
             }
-
-            if (!state.personas) state.personas = [];
-            if (!state.logs) state.logs = [];
-            if (!state.wants) state.wants = [];
-
-            initialPersonas.forEach(ip => {
-                if (!state.personas.find(p => p.name === ip.name)) {
-                    state.personas.push(ip);
-                }
-            });
-            initialWants.forEach((iwText, index) => {
-                if (!state.wants.find(w => w.text === iwText)) {
-                    state.wants.push({ id: 'w' + (Date.now() + index), text: iwText, personaId: null, completed: false });
-                }
-            });
-
-            // 初回ロードで追加した初期データをクラウドにも保存させる
-            await saveData();
-
-            renderSelect(); renderDashboard(); renderLogs(); renderWants();
         }
 
+        // クラウドへ保存
         async function saveData() {
             try { localStorage.setItem('innerTeamData', JSON.stringify(state)); } catch(e) {}
             try {
                 if (state.personas.length > 0) {
-                    const mappedPersonas = state.personas.map(p => ({
+                    const mappedPersonas = state.personas.filter(p=>p && p.id).map(p => ({
                         id: p.id.toString(), name: p.name, icon: p.icon, catchphrase: p.catchphrase,
                         likes: p.likes, dislikes: p.dislikes, benefit: p.benefit,
-                        prominence_percentage: p.prominence_percentage, level: p.level, last_log_id: p.lastLogId || 0
+                        prominence_percentage: p.prominence_percentage || 0, level: p.level || 1, last_log_id: p.lastLogId || 0
                     }));
                     await supabase.from('itm_personas').upsert(mappedPersonas);
                 }
                 if (state.wants.length > 0) {
-                    const mappedWants = state.wants.map(w => ({
+                    const mappedWants = state.wants.filter(w=>w && w.id).map(w => ({
                         id: w.id.toString(), text: w.text, persona_id: w.personaId || null, is_completed: w.completed || false
                     }));
                     await supabase.from('itm_wants').upsert(mappedWants);
                 }
                 if (state.logs.length > 0) {
-                    const mappedLogs = state.logs.map(l => ({
+                    const mappedLogs = state.logs.filter(l=>l && l.id).map(l => ({
                         id: l.id.toString(), text: l.text, persona_id: l.personaId || null, created_at: l.timestamp
                     }));
                     await supabase.from('itm_logs').upsert(mappedLogs);
                 }
             } catch (error) {
-                console.warn("クラウド保存エラー", error);
+                console.warn("クラウド保存エラー");
             }
         }
 
         function renderSelect() {
             const selectLog = document.getElementById('personaSelect');
             const selectWant = document.getElementById('wantPersonaSelect');
-            const optionsHTML = '<option value="" disabled selected>誰の視点・要望？</option>' + state.personas.map(p => `<option value="${p.id}">${p.icon} ${p.name}</option>`).join('');
+            const safePersonas = state.personas.filter(p => p && typeof p === 'object' && p.id);
+            const optionsHTML = '<option value="" disabled selected>誰の視点・要望？</option>' + 
+                safePersonas.map(p => `<option value="${p.id}">${p.icon} ${p.name}</option>`).join('');
             if(selectLog) selectLog.innerHTML = optionsHTML;
             if(selectWant) selectWant.innerHTML = optionsHTML;
         }
@@ -346,35 +360,90 @@
             const grid = document.getElementById('dashboardGrid');
             grid.innerHTML = '';
             grid.className = currentView === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4";
-            document.getElementById('totalLogsCount').textContent = state.totalLogs;
-            const sortedPersonas = [...state.personas].sort((a, b) => b.prominence_percentage - a.prominence_percentage);
+            document.getElementById('totalLogsCount').textContent = state.totalLogs || 0;
+            
+            // 安全にソート（データが壊れていても無視する）
+            const sortedPersonas = [...state.personas]
+                .filter(p => p && typeof p === 'object' && p.id)
+                .sort((a, b) => (b.prominence_percentage || 0) - (a.prominence_percentage || 0));
 
             sortedPersonas.forEach(p => {
-                const isInactive = state.totalLogs > 0 && (state.totalLogs - p.lastLogId) >= 3;
+                const isInactive = state.totalLogs > 0 && (state.totalLogs - (p.lastLogId || 0)) >= 3;
                 const inactiveClass = isInactive ? 'persona-inactive' : '';
                 const statusBadge = isInactive ? `<span class="text-xs px-2 py-1 rounded-full bg-gray-200 text-gray-500 font-medium whitespace-nowrap mt-1">💤 お留守</span>` : `<span class="text-xs px-2 py-1 rounded-full bg-[var(--color-text-main)] text-white font-medium whitespace-nowrap mt-1">✨ アクティブ</span>`;
                 let itemHTML = '';
 
                 if (currentView === 'grid') {
-                    itemHTML = `<div class="persona-card bg-white p-5 rounded-2xl flex flex-col h-full relative ${inactiveClass}">
-                        <div class="absolute top-4 right-4 flex flex-col gap-2 z-10">
-                            <button onclick="openEditMemberModal('${p.id}')" class="text-sm opacity-50 hover:opacity-100 hover:scale-110 transition-all cursor-pointer">✏️</button>
-                            <button onclick="deleteMember('${p.id}', '${p.name}')" class="text-sm opacity-50 hover:opacity-100 hover:scale-110 transition-all cursor-pointer">🗑️</button>
-                        </div>
-                        <div class="flex justify-between items-start mb-3 pr-10">
-                            <div class="flex items-center gap-2"><span class="text-3xl">${p.icon}</span><div><h3 class="font-bold text-lg leading-tight" style="color: var(--color-text-main);">${p.name}</h3><p class="text-xs font-semibold" style="color: var(--color-accent-khaki);">Lv. ${p.level}</p></div></div>
-                        </div>
-                        <div class="mb-2">${statusBadge}</div>
-                        <div class="mb-4 flex-grow"><p class="text-sm italic mb-3 font-medium" style="color: var(--color-text-main);">${p.catchphrase || '（口癖なし）'}</p><div class="text-xs space-y-1 mb-3"><p><span class="font-bold text-[var(--color-accent-red)]">♡ 好き:</span> ${p.likes || '-'}</p><p><span class="font-bold" style="color: var(--color-text-sub);">× 嫌い:</span> ${p.dislikes || '-'}</p></div><div class="text-xs p-2 rounded-lg bg-[var(--color-bg)] border border-[var(--color-gray)]"><p class="font-bold mb-1" style="color: var(--color-accent-red);">🎁 存在する理由・利益</p><p style="color: var(--color-text-main); line-height: 1.4;">${p.benefit || '未設定'}</p></div></div>
-                        <div class="mt-auto pt-4 border-t border-[var(--color-gray)]"><div class="flex justify-between items-end mb-1"><span class="text-xs font-semibold" style="color: var(--color-text-sub);">脳内シェア</span><span class="text-sm font-bold serif" style="color: var(--color-text-main);">${Math.round(p.prominence_percentage)}%</span></div><div class="w-full h-2 rounded-full progress-bar-bg overflow-hidden"><div class="h-full progress-bar-fill rounded-full" style="width: ${p.prominence_percentage}%"></div></div></div>
-                    </div>`;
+                    itemHTML = `
+                        <div class="persona-card bg-white p-5 rounded-2xl flex flex-col h-full relative ${inactiveClass}">
+                            <div class="absolute top-4 right-4 flex flex-col gap-2 z-10">
+                                <button onclick="openEditMemberModal('${p.id}')" class="text-sm opacity-50 hover:opacity-100 hover:scale-110 transition-all cursor-pointer">✏️</button>
+                                <button onclick="deleteMember('${p.id}', '${p.name}')" class="text-sm opacity-50 hover:opacity-100 hover:scale-110 transition-all cursor-pointer">🗑️</button>
+                            </div>
+                            <div class="flex justify-between items-start mb-3 pr-10">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-3xl">${p.icon || '👤'}</span>
+                                    <div>
+                                        <h3 class="font-bold text-lg leading-tight" style="color: var(--color-text-main);">${p.name || '名称未設定'}</h3>
+                                        <p class="text-xs font-semibold" style="color: var(--color-accent-khaki);">Lv. ${p.level || 1}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-2">${statusBadge}</div>
+                            <div class="mb-4 flex-grow">
+                                <p class="text-sm italic mb-3 font-medium" style="color: var(--color-text-main);">${p.catchphrase || '（口癖なし）'}</p>
+                                <div class="text-xs space-y-1 mb-3">
+                                    <p><span class="font-bold text-[var(--color-accent-red)]">♡ 好き:</span> ${p.likes || '-'}</p>
+                                    <p><span class="font-bold" style="color: var(--color-text-sub);">× 嫌い:</span> ${p.dislikes || '-'}</p>
+                                </div>
+                                <div class="text-xs p-2 rounded-lg bg-[var(--color-bg)] border border-[var(--color-gray)]">
+                                    <p class="font-bold mb-1" style="color: var(--color-accent-red);">🎁 存在する理由・利益</p>
+                                    <p style="color: var(--color-text-main); line-height: 1.4;">${p.benefit || '未設定'}</p>
+                                </div>
+                            </div>
+                            <div class="mt-auto pt-4 border-t border-[var(--color-gray)]">
+                                <div class="flex justify-between items-end mb-1">
+                                    <span class="text-xs font-semibold" style="color: var(--color-text-sub);">脳内シェア</span>
+                                    <span class="text-sm font-bold serif" style="color: var(--color-text-main);">${Math.round(p.prominence_percentage || 0)}%</span>
+                                </div>
+                                <div class="w-full h-2 rounded-full progress-bar-bg overflow-hidden">
+                                    <div class="h-full progress-bar-fill rounded-full" style="width: ${p.prominence_percentage || 0}%"></div>
+                                </div>
+                            </div>
+                        </div>`;
                 } else {
-                    itemHTML = `<div class="persona-list-item bg-white p-4 rounded-xl flex flex-col sm:flex-row gap-4 items-start sm:items-center relative ${inactiveClass}">
-                        <div class="absolute top-4 right-4 sm:top-1/2 sm:-translate-y-1/2 flex flex-col sm:flex-row gap-2 sm:gap-3 z-10"><button onclick="openEditMemberModal('${p.id}')" class="text-sm opacity-50 hover:opacity-100 hover:scale-110 transition-all cursor-pointer">✏️</button><button onclick="deleteMember('${p.id}', '${p.name}')" class="text-sm opacity-50 hover:opacity-100 hover:scale-110 transition-all cursor-pointer">🗑️</button></div>
-                        <div class="flex items-center gap-3 w-full sm:w-1/3 min-w-[200px] pr-10 sm:pr-20"><span class="text-3xl">${p.icon}</span><div><h3 class="font-bold text-base leading-tight" style="color: var(--color-text-main);">${p.name}</h3><div class="flex items-center gap-2 mt-1"><p class="text-xs font-semibold" style="color: var(--color-accent-khaki);">Lv. ${p.level}</p>${statusBadge}</div></div></div>
-                        <div class="w-full sm:w-1/3 text-sm flex-grow"><p class="italic text-[var(--color-text-main)] truncate">${p.catchphrase || '（口癖なし）'}</p><p class="text-xs mt-1 text-[var(--color-text-sub)] truncate">🎁 ${p.benefit || '理由未設定'}</p></div>
-                        <div class="w-full sm:w-1/4 flex items-center gap-3 pr-10 sm:pr-20"><div class="flex-grow"><div class="flex justify-between items-end mb-1"><span class="text-xs font-semibold" style="color: var(--color-text-sub);">シェア</span><span class="text-xs font-bold serif" style="color: var(--color-text-main);">${Math.round(p.prominence_percentage)}%</span></div><div class="w-full h-1.5 rounded-full progress-bar-bg overflow-hidden"><div class="h-full progress-bar-fill rounded-full" style="width: ${p.prominence_percentage}%"></div></div></div></div>
-                    </div>`;
+                    itemHTML = `
+                        <div class="persona-list-item bg-white p-4 rounded-xl flex flex-col sm:flex-row gap-4 items-start sm:items-center relative ${inactiveClass}">
+                            <div class="absolute top-4 right-4 sm:top-1/2 sm:-translate-y-1/2 flex flex-col sm:flex-row gap-2 sm:gap-3 z-10">
+                                <button onclick="openEditMemberModal('${p.id}')" class="text-sm opacity-50 hover:opacity-100 hover:scale-110 transition-all cursor-pointer">✏️</button>
+                                <button onclick="deleteMember('${p.id}', '${p.name}')" class="text-sm opacity-50 hover:opacity-100 hover:scale-110 transition-all cursor-pointer">🗑️</button>
+                            </div>
+                            <div class="flex items-center gap-3 w-full sm:w-1/3 min-w-[200px] pr-10 sm:pr-20">
+                                <span class="text-3xl">${p.icon || '👤'}</span>
+                                <div>
+                                    <h3 class="font-bold text-base leading-tight" style="color: var(--color-text-main);">${p.name || '名称未設定'}</h3>
+                                    <div class="flex items-center gap-2 mt-1">
+                                        <p class="text-xs font-semibold" style="color: var(--color-accent-khaki);">Lv. ${p.level || 1}</p>
+                                        ${statusBadge}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="w-full sm:w-1/3 text-sm flex-grow">
+                                <p class="italic text-[var(--color-text-main)] truncate">${p.catchphrase || '（口癖なし）'}</p>
+                                <p class="text-xs mt-1 text-[var(--color-text-sub)] truncate">🎁 ${p.benefit || '理由未設定'}</p>
+                            </div>
+                            <div class="w-full sm:w-1/4 flex items-center gap-3 pr-10 sm:pr-20">
+                                <div class="flex-grow">
+                                    <div class="flex justify-between items-end mb-1">
+                                        <span class="text-xs font-semibold" style="color: var(--color-text-sub);">シェア</span>
+                                        <span class="text-xs font-bold serif" style="color: var(--color-text-main);">${Math.round(p.prominence_percentage || 0)}%</span>
+                                    </div>
+                                    <div class="w-full h-1.5 rounded-full progress-bar-bg overflow-hidden">
+                                        <div class="h-full progress-bar-fill rounded-full" style="width: ${p.prominence_percentage || 0}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
                 }
                 grid.insertAdjacentHTML('beforeend', itemHTML);
             });
@@ -396,13 +465,15 @@
 
         function renderLogs() {
             const container = document.getElementById('logHistoryContainer'); container.innerHTML = '';
-            if (state.logs.length === 0) { container.innerHTML = '<p class="text-sm text-center py-4" style="color: var(--color-text-sub);">まだ記録はありません。最初の気づきを書いてみましょう。</p>'; return; }
-            state.logs.forEach(log => {
-                const persona = state.personas.find(p => p.id === log.personaId);
+            const safeLogs = state.logs.filter(l => l && typeof l === 'object');
+            if (safeLogs.length === 0) { container.innerHTML = '<p class="text-sm text-center py-4" style="color: var(--color-text-sub);">まだ記録はありません。最初の気づきを書いてみましょう。</p>'; return; }
+            safeLogs.forEach(log => {
+                const persona = state.personas.find(p => p && p.id === log.personaId);
                 const personaIcon = persona ? persona.icon : '👤';
                 const personaName = persona ? persona.name : '削除されたメンバー';
                 const dateObj = new Date(log.timestamp);
                 const dateStr = `${dateObj.getMonth() + 1}/${dateObj.getDate()} ${dateObj.getHours().toString().padStart(2, '0')}:${dateObj.getMinutes().toString().padStart(2, '0')}`;
+
                 container.insertAdjacentHTML('beforeend', `<div class="flex gap-3 p-3 rounded-xl bg-[var(--color-bg)] border border-[var(--color-gray)]"><div class="text-2xl mt-1">${personaIcon}</div><div class="flex-grow"><div class="flex justify-between items-start mb-1"><span class="text-xs font-bold px-2 py-0.5 rounded bg-white border border-[var(--color-gray)]" style="color: var(--color-text-main);">${personaName}</span><span class="text-xs" style="color: var(--color-text-sub);">${dateStr}</span></div><p class="text-sm whitespace-pre-wrap" style="color: var(--color-text-main); line-height: 1.5;">${log.text}</p></div></div>`);
             });
         }
@@ -420,25 +491,30 @@
 
             state.totalLogs++;
             state.logs.unshift({ id: Date.now(), text: text, personaId: personaId, timestamp: new Date().toISOString() });
-            const activePersona = state.personas.find(p => p.id === personaId);
-            activePersona.level++; activePersona.lastLogId = state.totalLogs;
-            let bonus = 10;
-            if (activePersona.prominence_percentage + bonus > 100) bonus = 100 - activePersona.prominence_percentage;
-            const otherPersonas = state.personas.filter(p => p.id !== personaId);
-            let totalOtherProminence = otherPersonas.reduce((sum, p) => sum + p.prominence_percentage, 0);
-            if (totalOtherProminence > 0) {
-                otherPersonas.forEach(p => {
-                    let deduction = bonus * (p.prominence_percentage / totalOtherProminence);
-                    p.prominence_percentage = Math.max(0, p.prominence_percentage - deduction);
-                });
-            }
-            activePersona.prominence_percentage += bonus;
-            let newTotal = state.personas.reduce((sum, p) => sum + p.prominence_percentage, 0);
-            state.personas.forEach(p => { p.prominence_percentage = (p.prominence_percentage / newTotal) * 100; });
 
-            await saveData(); renderDashboard(); renderLogs();
+            const activePersona = state.personas.find(p => p && p.id === personaId);
+            if(activePersona) {
+                activePersona.level = (activePersona.level || 1) + 1; 
+                activePersona.lastLogId = state.totalLogs;
+                let bonus = 10;
+                if (activePersona.prominence_percentage + bonus > 100) bonus = 100 - activePersona.prominence_percentage;
+
+                const otherPersonas = state.personas.filter(p => p && p.id !== personaId);
+                let totalOtherProminence = otherPersonas.reduce((sum, p) => sum + (p.prominence_percentage || 0), 0);
+                if (totalOtherProminence > 0) {
+                    otherPersonas.forEach(p => {
+                        let deduction = bonus * ((p.prominence_percentage || 0) / totalOtherProminence);
+                        p.prominence_percentage = Math.max(0, (p.prominence_percentage || 0) - deduction);
+                    });
+                }
+                activePersona.prominence_percentage += bonus;
+                let newTotal = state.personas.reduce((sum, p) => sum + (p.prominence_percentage || 0), 0);
+                state.personas.forEach(p => { p.prominence_percentage = ((p.prominence_percentage || 0) / newTotal) * 100; });
+            }
+
+            await saveData(); safeRenderAll();
             document.getElementById('logText').value = ''; document.getElementById('personaSelect').value = '';
-            showToast(`記録完了！「${activePersona.name}」のレベルが上がりました。`);
+            showToast(`記録完了！`);
         });
 
         function openAddMemberModal() {
@@ -449,7 +525,7 @@
 
         function openEditMemberModal(id) {
             editingMemberId = id; document.querySelector('#addMemberModal h3').textContent = 'メンバー情報を編集する';
-            const persona = state.personas.find(p => p.id === id);
+            const persona = state.personas.find(p => p && p.id === id);
             if (persona) {
                 document.getElementById('newMemberName').value = persona.name || ''; document.getElementById('newMemberIcon').value = persona.icon || '';
                 document.getElementById('newMemberProminence').value = persona.prominence_percentage || 0; document.getElementById('newMemberCatchphrase').value = persona.catchphrase || '';
@@ -466,11 +542,16 @@
         async function deleteMember(id, name) {
             if (!confirm(`「${name}」をチームから手放しますか？\n※この操作は取り消せません。`)) return;
             try { await supabase.from('itm_personas').delete().eq('id', id); } catch(e) {}
-            state.personas = state.personas.filter(p => p.id !== id);
-            if (state.wants) { state.wants.forEach(w => { if (w.personaId === id) w.personaId = null; }); }
-            let totalProminence = state.personas.reduce((sum, p) => sum + p.prominence_percentage, 0);
-            if (totalProminence > 0) { state.personas.forEach(p => { p.prominence_percentage = (p.prominence_percentage / totalProminence) * 100; }); }
-            await saveData(); renderSelect(); renderDashboard(); renderWants(); showToast(`「${name}」を手放しました。`);
+            
+            state.personas = state.personas.filter(p => p && p.id !== id);
+            if (state.wants) state.wants.forEach(w => { if (w.personaId === id) w.personaId = null; });
+            
+            let totalProminence = state.personas.reduce((sum, p) => sum + (p.prominence_percentage || 0), 0);
+            if (totalProminence > 0) {
+                state.personas.forEach(p => { p.prominence_percentage = ((p.prominence_percentage || 0) / totalProminence) * 100; });
+            }
+
+            await saveData(); safeRenderAll(); showToast(`「${name}」を手放しました。`);
         }
 
         document.getElementById('addMemberForm').addEventListener('submit', async function(e) {
@@ -479,19 +560,22 @@
             const catchphraseVal = document.getElementById('newMemberCatchphrase').value || ''; const likesVal = document.getElementById('newMemberLikes').value || '';
             const dislikesVal = document.getElementById('newMemberDislikes').value || ''; const benefitVal = document.getElementById('newMemberBenefit').value || '';
             const prominenceVal = parseFloat(document.getElementById('newMemberProminence').value) || 0;
+
             if (editingMemberId) {
-                const persona = state.personas.find(p => p.id === editingMemberId);
+                const persona = state.personas.find(p => p && p.id === editingMemberId);
                 if (persona) {
                     persona.name = nameVal; persona.icon = iconVal; persona.catchphrase = catchphraseVal; persona.likes = likesVal; persona.dislikes = dislikesVal; persona.benefit = benefitVal; persona.prominence_percentage = prominenceVal;
                 }
-                showToast(`「${nameVal}」の情報を更新しました！`);
+                showToast(`情報を更新しました！`);
             } else {
                 const newMember = { id: 'p' + Date.now(), name: nameVal, icon: iconVal, catchphrase: catchphraseVal, likes: likesVal, dislikes: dislikesVal, benefit: benefitVal, prominence_percentage: prominenceVal, level: 1, lastLogId: state.totalLogs };
-                state.personas.push(newMember); showToast(`新しいメンバー「${nameVal}」を迎え入れました！`);
+                state.personas.push(newMember); showToast(`「${nameVal}」を迎え入れました！`);
             }
-            let totalProminence = state.personas.reduce((sum, p) => sum + p.prominence_percentage, 0);
-            if (totalProminence > 0) { state.personas.forEach(p => { p.prominence_percentage = (p.prominence_percentage / totalProminence) * 100; }); }
-            await saveData(); renderSelect(); renderDashboard(); closeAddMemberModal();
+            
+            let totalProminence = state.personas.reduce((sum, p) => sum + (p.prominence_percentage || 0), 0);
+            if (totalProminence > 0) { state.personas.forEach(p => { p.prominence_percentage = ((p.prominence_percentage || 0) / totalProminence) * 100; }); }
+
+            await saveData(); safeRenderAll(); closeAddMemberModal();
         });
 
         document.getElementById('addMemberModal').addEventListener('click', function(e) { if (e.target === this) closeAddMemberModal(); });
@@ -502,47 +586,48 @@
                 e.preventDefault();
                 const input = document.getElementById('wantInput'); const text = input.value.trim(); if (!text) return;
                 state.wants.unshift({ id: 'w' + Date.now(), text: text, personaId: null, completed: false });
-                await saveData(); renderWants(); input.value = ''; showToast('やりたいことを追加しました！');
+                await saveData(); renderWants(); input.value = ''; showToast('追加しました！');
             });
         }
 
         function renderWants() {
             const list = document.getElementById('wantsList'); list.innerHTML = '';
-            if (!state.wants || state.wants.length === 0) { list.innerHTML = '<p class="text-sm text-center py-4" style="color: var(--color-text-sub);">まだやりたいことはありません。小さなことから書いてみましょう。</p>'; return; }
-            state.wants.forEach(want => {
-                const persona = state.personas.find(p => p.id === want.personaId);
+            const safeWants = state.wants.filter(w => w && typeof w === 'object');
+            if (safeWants.length === 0) { list.innerHTML = '<p class="text-sm text-center py-4" style="color: var(--color-text-sub);">まだやりたいことはありません。小さなことから書いてみましょう。</p>'; return; }
+            safeWants.forEach(want => {
+                const persona = state.personas.find(p => p && p.id === want.personaId);
                 const personaIcon = persona ? persona.icon : '👤'; const personaName = persona ? persona.name : '未設定';
                 const li = document.createElement('li'); li.className = "flex flex-col sm:flex-row sm:items-center justify-between p-3 gap-3 rounded-lg border border-[var(--color-gray)] bg-[var(--color-bg)] transition-colors hover:bg-white";
                 const isChecked = want.completed ? 'checked' : ''; const textClass = want.completed ? 'line-through text-[var(--color-text-sub)]' : 'text-[var(--color-text-main)]';
                 
                 let selectHTML = `<select onchange="updateWantPersona('${want.id}', this.value)" class="w-full sm:w-auto sm:max-w-[180px] p-2 text-xs rounded-lg border border-[var(--color-gray)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-khaki)] bg-white cursor-pointer" style="color: var(--color-text-main);">`;
                 selectHTML += `<option value="" ${!want.personaId ? 'selected' : ''} disabled>誰の要望？</option>`;
-                state.personas.forEach(p => { const isSelected = p.id === want.personaId ? 'selected' : ''; selectHTML += `<option value="${p.id}" ${isSelected}>${p.icon} ${p.name}</option>`; });
+                state.personas.filter(p=>p).forEach(p => { const isSelected = p.id === want.personaId ? 'selected' : ''; selectHTML += `<option value="${p.id}" ${isSelected}>${p.icon} ${p.name}</option>`; });
                 selectHTML += `</select>`;
 
-                li.innerHTML = `
-                    <div class="flex items-center gap-3 flex-grow pr-2 overflow-hidden"><input type="checkbox" ${isChecked} onchange="toggleWant('${want.id}')" class="w-5 h-5 accent-[var(--color-accent-khaki)] cursor-pointer rounded flex-shrink-0"><span class="${textClass} font-medium text-sm sm:text-base truncate" title="${want.text}">${want.text}</span></div>
+                li.innerHTML = `<div class="flex items-center gap-3 flex-grow pr-2 overflow-hidden"><input type="checkbox" ${isChecked} onchange="toggleWant('${want.id}')" class="w-5 h-5 accent-[var(--color-accent-khaki)] cursor-pointer rounded flex-shrink-0"><span class="${textClass} font-medium text-sm sm:text-base truncate" title="${want.text}">${want.text}</span></div>
                     <div class="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto justify-end mt-2 sm:mt-0">${selectHTML}<button onclick="deleteWant('${want.id}')" class="text-[var(--color-text-sub)] hover:text-red-400 transition-colors p-2 flex-shrink-0" title="削除"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button></div>`;
                 list.appendChild(li);
             });
         }
 
         async function updateWantPersona(id, personaId) {
-            const want = state.wants.find(w => w.id === id);
-            if (want) { want.personaId = personaId; await saveData(); showToast('誰の要望かを保存しました！'); }
+            const want = state.wants.find(w => w && w.id === id);
+            if (want) { want.personaId = personaId; await saveData(); showToast('保存しました！'); }
         }
 
         async function toggleWant(id) {
-            const want = state.wants.find(w => w.id === id);
+            const want = state.wants.find(w => w && w.id === id);
             if (want) { want.completed = !want.completed; await saveData(); renderWants(); }
         }
 
         async function deleteWant(id) {
             try { await supabase.from('itm_wants').delete().eq('id', id); } catch(e) {}
-            state.wants = state.wants.filter(w => w.id !== id); await saveData(); renderWants();
+            state.wants = state.wants.filter(w => w && w.id !== id); await saveData(); renderWants();
         }
 
         window.onload = async function() { await loadData(); };
+
     </script>
 </body>
 </html>
